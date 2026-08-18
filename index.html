@@ -13,6 +13,7 @@
             margin: 0;
             overflow-x: hidden;
             background-color: #111827; /* Tailwind gray-900 */
+            touch-action: manipulation; /* Kills the 300ms tap delay on mobile completely */
         }
         
         .timer-font {
@@ -22,9 +23,7 @@
             text-shadow: 0 10px 25px rgba(0,0,0,0.2);
             direction: ltr; /* Force LTR for the clock numbers so they never flip */
             
-            /* Responsive Magic: 
-               Uses 30% of width OR 40% of height, whichever is smaller.
-               This prevents vertical overflow in landscape and horizontal overflow in portrait! */
+            /* Responsive Magic: Uses 30% of width OR 40% of height */
             font-size: clamp(4rem, min(30vw, 40vh), 30rem);
         }
         
@@ -33,7 +32,7 @@
             transition: background-color 1s ease-in-out, color 0.5s ease-in-out;
         }
 
-        /* RTL-specific styling adjustments handled by CSS attribute selectors */
+        /* RTL-specific styling adjustments */
         html[dir="rtl"] body {
             font-family: 'Cairo', 'Inter', sans-serif;
         }
@@ -61,7 +60,7 @@
         <div class="max-w-md w-full bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 border border-gray-700 z-10 w-full">
             <div class="text-center mb-8">
                 <h1 id="ui-title" class="text-3xl md:text-4xl font-bold mb-3">Break Timer</h1>
-                <!-- Author credit replaced the subtitle -->
+                <!-- Author credit -->
                 <p class="text-gray-400 text-sm hover:text-gray-300 transition-colors leading-relaxed">
                     <span id="ui-made-by">Made by</span> 
                     <a href="https://www.linkedin.com/in/omaryaseen?utm_source=share_via&utm_content=profile&utm_medium=member_android" target="_blank" rel="noopener noreferrer" class="font-bold text-emerald-500 hover:text-emerald-400 underline decoration-emerald-500/30 underline-offset-4 whitespace-nowrap">
@@ -98,25 +97,10 @@
     </div>
 
     <!-- Timer Screen -->
-    <!-- Hidden by default. Height is restricted exactly to screen size -->
-    <div id="timer-screen" class="hidden color-transition h-screen w-screen flex flex-col items-center justify-center relative bg-emerald-500 text-white overflow-hidden">
+    <div id="timer-screen" class="hidden color-transition h-screen w-screen flex flex-col items-center justify-center relative bg-emerald-500 text-white overflow-hidden cursor-pointer">
         
-        <!-- The Giant Clock -->
-        <div id="time-display" class="timer-font font-bold tracking-tight z-10 text-center px-4 w-full truncate cursor-default pointer-events-none">
-            15:00
-        </div>
-        
-        <!-- Messages -->
-        <div id="times-up-text" class="hidden absolute top-1/4 text-4xl md:text-6xl font-bold uppercase tracking-widest opacity-80 animate-bounce pointer-events-none text-center px-4">
-            Time is up!
-        </div>
-
-        <div id="paused-text" class="hidden absolute top-1/4 text-3xl md:text-5xl font-bold uppercase tracking-widest opacity-90 pointer-events-none text-center px-4">
-            Paused
-        </div>
-
-        <!-- Controls Area (Bottom) -->
-        <div id="controls-container" class="absolute bottom-0 left-0 w-full pt-32 pb-6 md:pb-10 flex items-end justify-center transition-opacity duration-500 z-20 bg-gradient-to-t from-black/60 to-transparent">
+        <!-- Controls Area (Moved to Top) -->
+        <div id="controls-container" class="absolute top-0 left-0 w-full pb-32 pt-6 md:pt-10 flex items-start justify-center transition-opacity duration-300 z-20 bg-gradient-to-b from-black/60 to-transparent">
             <!-- direction is forced LTR so icons stay in logical order regardless of language -->
             <div class="flex items-center gap-3 md:gap-8 bg-black/50 backdrop-blur-md rounded-3xl px-4 md:px-6 py-3 md:py-4 border border-white/10" dir="ltr">
                 
@@ -139,6 +123,20 @@
                     <span id="lbl-fullscreen" class="text-[10px] md:text-xs font-bold uppercase tracking-wider">Fullscreen</span>
                 </button>
             </div>
+        </div>
+
+        <!-- The Giant Clock -->
+        <div id="time-display" class="timer-font font-bold tracking-tight z-10 text-center px-4 w-full truncate pointer-events-none mt-12 md:mt-0">
+            15:00
+        </div>
+        
+        <!-- Messages -->
+        <div id="times-up-text" class="hidden absolute bottom-1/4 text-4xl md:text-6xl font-bold uppercase tracking-widest opacity-80 animate-bounce pointer-events-none text-center px-4">
+            Time is up!
+        </div>
+
+        <div id="paused-text" class="hidden absolute bottom-1/4 text-3xl md:text-5xl font-bold uppercase tracking-widest opacity-90 pointer-events-none text-center px-4">
+            Paused
         </div>
     </div>
 
@@ -222,7 +220,6 @@
             document.getElementById('lbl-fullscreen').textContent = translations[currentLang].lblFullscreen;
         }
 
-
         // --- Timer Logic ---
         let timerInterval;
         let remainingSeconds = 0;
@@ -241,10 +238,9 @@
 
         const WARNING_THRESHOLD = 120; // 2 minutes (120 seconds)
 
-        // --- Controls Visibility Logic (Fixed for Mobile) ---
+        // --- Controls Visibility Logic (Flawless Mobile Update) ---
         let hideControlsTimeout;
         let controlsVisible = true;
-        let lastToggleTime = 0;
 
         function showControls() {
             controlsContainer.classList.remove('opacity-0', 'pointer-events-none');
@@ -265,13 +261,10 @@
             hideControlsTimeout = setTimeout(hideControls, 3000);
         }
 
-        // Screen Click: Explicitly toggles visibility on/off
+        // 1. Explicit Click: Snappy toggle on both mobile and desktop
         timerScreen.addEventListener('click', (e) => {
-            // Ignore if the user is clicking directly on the buttons
+            // Ignore if clicking the actual buttons
             if (e.target.closest('#controls-container')) return;
-
-            // Track the time we clicked to prevent mousemove from immediately waking it back up
-            lastToggleTime = Date.now(); 
 
             if (controlsVisible) {
                 hideControls();
@@ -280,19 +273,17 @@
             }
         });
 
-        // Mouse Move: Only wakes up the controls on desktop.
-        timerScreen.addEventListener('mousemove', () => {
-            // If we *just* tapped the screen to hide it (< 500ms ago), ignore this event
-            // (Mobile browsers fire a fake mousemove event immediately after a tap)
-            if (Date.now() - lastToggleTime < 500) return;
-
-            if (!controlsVisible) {
-                showControls();
-            } else {
-                resetIdleTimer();
+        // 2. Mouse Move: Wakes up controls ONLY for actual mouse movements (Desktop)
+        // Using pointermove lets us check if it's a 'mouse' and ignore 'touch'
+        timerScreen.addEventListener('pointermove', (e) => {
+            if (e.pointerType === 'mouse') {
+                if (!controlsVisible) {
+                    showControls();
+                } else {
+                    resetIdleTimer();
+                }
             }
         });
-
 
         // --- Timer Functions ---
         function startCustomTimer() {
@@ -322,10 +313,7 @@
             updateDisplay();
             showControls(); // Show controls when starting
             
-            // Clear existing interval if any
             if (timerInterval) clearInterval(timerInterval);
-            
-            // Start the loop
             timerInterval = setInterval(tick, 1000);
         }
 
@@ -341,15 +329,13 @@
         }
 
         function updateDisplay() {
-            // Calculate MM:SS
             const minutes = Math.floor(remainingSeconds / 60);
             const seconds = remainingSeconds % 60;
             
-            // Format with leading zeros
             const displayStr = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
             timeDisplay.textContent = displayStr;
 
-            // Traffic Light Color Logic
+            // Background Logic
             if (remainingSeconds === 0) {
                 timerScreen.className = 'color-transition h-screen w-screen flex flex-col items-center justify-center relative bg-red-600 text-white cursor-pointer overflow-hidden';
             } else if (remainingSeconds <= WARNING_THRESHOLD) {
@@ -368,11 +354,11 @@
             setTimeout(() => {
                 timerScreen.classList.remove('animate-pulse');
             }, 3000);
-            showControls(); // Wake up controls when time ends
+            showControls(); 
         }
 
         function togglePause(event) {
-            if (event) event.stopPropagation(); // Prevent the screen click toggle
+            if (event) event.stopPropagation(); // Stop click from bubbling up to timerScreen
             if (remainingSeconds <= 0) return; 
             
             isPaused = !isPaused;
@@ -397,7 +383,7 @@
             if (event) event.stopPropagation();
             clearInterval(timerInterval);
             
-            // UI Switch: Restore body scrolling
+            // Restore body scrolling
             document.body.classList.remove('no-scroll');
             setupScreen.classList.remove('hidden');
             timerScreen.classList.add('hidden');
@@ -412,7 +398,7 @@
             }
         }
 
-        // --- Robust Cross-Browser Fullscreen ---
+        // --- Fullscreen ---
         function toggleFullScreen(event) {
             if (event) event.stopPropagation();
             const docElm = document.documentElement;
@@ -421,13 +407,11 @@
             const isFullscreen = doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement;
 
             if (!isFullscreen) {
-                // Force Enter Fullscreen
                 if (docElm.requestFullscreen) docElm.requestFullscreen();
                 else if (docElm.webkitRequestFullscreen) docElm.webkitRequestFullscreen();
                 else if (docElm.mozRequestFullScreen) docElm.mozRequestFullScreen();
                 else if (docElm.msRequestFullscreen) docElm.msRequestFullscreen();
             } else {
-                // Exit Fullscreen
                 if (doc.exitFullscreen) doc.exitFullscreen();
                 else if (doc.webkitExitFullscreen) doc.webkitExitFullscreen();
                 else if (doc.mozCancelFullScreen) doc.mozCancelFullScreen();
