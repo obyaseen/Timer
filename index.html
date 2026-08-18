@@ -241,9 +241,10 @@
 
         const WARNING_THRESHOLD = 120; // 2 minutes (120 seconds)
 
-        // --- Controls Visibility Logic ---
+        // --- Controls Visibility Logic (Fixed for Mobile) ---
         let hideControlsTimeout;
         let controlsVisible = true;
+        let lastToggleTime = 0;
 
         function showControls() {
             controlsContainer.classList.remove('opacity-0', 'pointer-events-none');
@@ -254,7 +255,6 @@
 
         function hideControls() {
             controlsContainer.classList.remove('opacity-100');
-            // Adding pointer-events-none ensures hidden buttons can't be clicked
             controlsContainer.classList.add('opacity-0', 'pointer-events-none');
             controlsVisible = false;
             clearTimeout(hideControlsTimeout);
@@ -265,10 +265,13 @@
             hideControlsTimeout = setTimeout(hideControls, 3000);
         }
 
-        // Screen Click: Toggles visibility
+        // Screen Click: Explicitly toggles visibility on/off
         timerScreen.addEventListener('click', (e) => {
-            // Ignore if the user is clicking directly on the controls
+            // Ignore if the user is clicking directly on the buttons
             if (e.target.closest('#controls-container')) return;
+
+            // Track the time we clicked to prevent mousemove from immediately waking it back up
+            lastToggleTime = Date.now(); 
 
             if (controlsVisible) {
                 hideControls();
@@ -277,21 +280,19 @@
             }
         });
 
-        // Mouse Move / Touch: Wakes up controls and resets idle timer
+        // Mouse Move: Only wakes up the controls on desktop.
         timerScreen.addEventListener('mousemove', () => {
+            // If we *just* tapped the screen to hide it (< 500ms ago), ignore this event
+            // (Mobile browsers fire a fake mousemove event immediately after a tap)
+            if (Date.now() - lastToggleTime < 500) return;
+
             if (!controlsVisible) {
                 showControls();
             } else {
                 resetIdleTimer();
             }
         });
-        timerScreen.addEventListener('touchstart', () => {
-            if (!controlsVisible) {
-                showControls();
-            } else {
-                resetIdleTimer();
-            }
-        });
+
 
         // --- Timer Functions ---
         function startCustomTimer() {
@@ -437,6 +438,5 @@
     </script>
 </body>
 </html>
-
 
 
